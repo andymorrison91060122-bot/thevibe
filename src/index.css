@@ -1,0 +1,208 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Space+Grotesk:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "Fira Code", ui-monospace, monospace;
+}
+
+/* Glassmorphism custom classes with warmer background shadows */
+.glass-panel {
+  background: rgba(14, 8, 15, 0.55);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+}
+
+.glass-card {
+  background: rgba(18, 10, 20, 0.72);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85);
+  transform: translateZ(0);
+  overflow: hidden;
+}
+
+/* Spotlight tracker using ::before pseudo-element */
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--mouse-x, -999px) var(--mouse-y, -999px),
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 40%
+  );
+  opacity: 1;
+  pointer-events: none;
+  z-index: 10;
+  mix-blend-mode: overlay;
+  will-change: background;
+  transform: translateZ(0);
+}
+
+/* Edge Shimmer (边缘流光) using mask-composite to trace the border physical contours */
+.glass-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    circle at var(--mouse-x, -999px) var(--mouse-y, -999px),
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 11;
+  mix-blend-mode: overlay;
+  will-change: background;
+  transform: translateZ(0);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.3);
+  outline: none;
+}
+
+/* Liquid fluid motion animations */
+@keyframes fluidMove {
+  0% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(40px, -60px) scale(1.25) rotate(120deg);
+  }
+  66% {
+    transform: translate(-30px, 30px) scale(0.85) rotate(240deg);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1) rotate(360deg);
+  }
+}
+
+/* High tension phase 3 flash breathing */
+@keyframes climaxBreathing {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1) translate(0px, 0px);
+    filter: blur(80px) saturate(1.8);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.3) translate(50px, -40px) rotate(180deg);
+    filter: blur(60px) saturate(2.5);
+  }
+}
+
+@keyframes climaxBreathingReverse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1) translate(0px, 0px);
+    filter: blur(80px) saturate(1.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.25) translate(-40px, 50px) rotate(-180deg);
+    filter: blur(60px) saturate(2.4);
+  }
+}
+
+/* PHASE 1: Gentle Morning - 24s/34s flow speed */
+.animate-fluid-p1-light {
+  animation: fluidMove 24s infinite alternate ease-in-out;
+}
+.animate-fluid-p1-dark {
+  animation: fluidMove 34s infinite alternate-reverse ease-in-out;
+}
+
+/* PHASE 2: Dragonfruit & Amber - 1.5x accelerated speed (16s/22s) */
+.animate-fluid-p2-light {
+  animation: fluidMove 16s infinite alternate ease-in-out;
+}
+.animate-fluid-p2-dark {
+  animation: fluidMove 22s infinite alternate-reverse ease-in-out;
+}
+
+/* PHASE 3: Climax Neon Purple & Crimson - Intense pulsing rhythm (8s/11s) */
+.animate-fluid-p3-light {
+  animation: climaxBreathing 9s infinite alternate ease-in-out;
+}
+.animate-fluid-p3-dark {
+  animation: climaxBreathingReverse 12s infinite alternate-reverse ease-in-out;
+}
+
+/* Pulse glow class with faster breathing scale loop */
+@keyframes pulseGlowFast {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.08);
+  }
+}
+
+.animate-pulse-glow-rapid {
+  animation: pulseGlowFast 4s infinite ease-in-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+}
+
+/* Idle State Text Shimmer */
+@keyframes textShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.text-shimmer {
+  transition: color 0.8s cubic-bezier(0.25, 1, 0.5, 1), -webkit-text-fill-color 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.is-idle .text-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 1) 25%,
+    rgba(255, 154, 158, 0.95) 50%,
+    rgba(255, 255, 255, 1) 75%,
+    rgba(255, 255, 255, 0.6) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: textShimmer 12s linear infinite;
+}
+
+

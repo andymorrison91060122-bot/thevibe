@@ -1,0 +1,6 @@
+{
+  "name": "The Vibe",
+  "description": "一款兼具高级感与意境的情侣亲密互动卡牌游戏，让沟通兼具安全感与朦胧浪漫的氛围。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
