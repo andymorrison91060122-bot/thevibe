@@ -10,20 +10,28 @@
 /* Glassmorphism custom classes with warmer background shadows */
 .glass-panel {
   background: rgba(14, 8, 15, 0.55);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
 }
 
 .glass-card {
   background: rgba(18, 10, 20, 0.72);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85);
   transform: translateZ(0);
+  contain: paint;
   overflow: hidden;
+}
+
+.ambient-blob,
+.stage-motion-layer {
+  contain: paint;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
 }
 
 /* Spotlight tracker using ::before pseudo-element */
@@ -41,7 +49,6 @@
   pointer-events: none;
   z-index: 10;
   mix-blend-mode: overlay;
-  will-change: background;
   transform: translateZ(0);
 }
 
@@ -64,8 +71,12 @@
   pointer-events: none;
   z-index: 11;
   mix-blend-mode: overlay;
-  will-change: background;
   transform: translateZ(0);
+}
+
+.card-dragging .glass-card::before,
+.card-dragging .glass-card::after {
+  opacity: 0;
 }
 
 .glass-input {
@@ -204,5 +215,4 @@
   background-clip: text;
   animation: textShimmer 12s linear infinite;
 }
-
 
