@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { motion, animate } from 'motion/react';
+import React, { useMemo } from 'react';
+import { motion } from 'motion/react';
 
 interface BackgroundGlowProps {
   temperature: number; // 0 to 100
@@ -32,7 +32,7 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           opacityC: 0.15,
           opacityD: 0.15,
           scale: 1.0,
-          blur: 'blur-[100px]',
+          blur: 'blur-[72px]',
           duration: 15, // extremely slow & dreamy
           // Ambient background mesh gradient
           bgStyle: 'from-[#140810] via-[#0b0307] to-[#040003]',
@@ -50,7 +50,7 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           opacityC: 0.30,
           opacityD: 0.25,
           scale: 1.3,
-          blur: 'blur-[120px]',
+          blur: 'blur-[80px]',
           duration: 8, // swifter tipsy movement
           bgStyle: 'from-[#2e0007] via-[#120002] to-[#050001]',
           pulseColor: 'rgba(255, 8, 68, 0.12)',
@@ -68,7 +68,7 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           opacityC: 0.45,
           opacityD: 0.40,
           scale: 1.6,
-          blur: 'blur-[130px]',
+          blur: 'blur-[90px]',
           duration: 4, // extremely passionate, fast-flowing
           bgStyle: 'from-[#210031] via-[#090013] to-[#020005]',
           pulseColor: 'rgba(178, 36, 239, 0.25)',
@@ -76,23 +76,7 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
     }
   }, [phase]);
 
-  // Target base duration depending on phase and isIdle (25s when idle)
-  const targetDuration = isIdle ? 25 : config.duration;
-
-  // State to smoothly interpolate speed over 800ms
-  const [currentDuration, setCurrentDuration] = useState(config.duration);
-
-  useEffect(() => {
-    const controls = animate(currentDuration, targetDuration, {
-      duration: 0.8,
-      ease: [0.25, 0.1, 0.25, 1.0],
-      onUpdate: (latest) => {
-        setCurrentDuration(latest);
-      }
-    });
-
-    return () => controls.stop();
-  }, [targetDuration]);
+  const animationDuration = isIdle ? 25 : config.duration;
 
   return (
     <div className={`fixed inset-0 -z-50 overflow-hidden bg-gradient-to-b ${config.bgStyle} transition-colors duration-1000 select-none`}>
@@ -105,24 +89,18 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           animate={{
             x: [0, 160, -90, 80, 0],
             y: [0, -120, 100, -140, 0],
-            borderRadius: [
-              "42% 58% 70% 30% / 45% 45% 55% 55%",
-              "70% 30% 52% 48% / 60% 40% 60% 40%",
-              "50% 50% 40% 60% / 40% 60% 50% 50%",
-              "30% 70% 65% 35% / 50% 30% 70% 50%",
-              "42% 58% 70% 30% / 45% 45% 55% 55%"
-            ],
           }}
           transition={{
-            duration: currentDuration,
+            duration: animationDuration,
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className={`absolute -top-10 -left-10 w-96 h-96 ${config.blur} mix-blend-screen transition-all duration-[1200ms] pointer-events-none`}
+          className={`ambient-blob absolute -top-10 -left-10 w-96 h-96 ${config.blur} mix-blend-screen transition-opacity duration-[1200ms] pointer-events-none`}
           style={{
             backgroundColor: config.blobA,
             opacity: config.opacityA,
             scale: config.scale,
+            borderRadius: "42% 58% 70% 30% / 45% 45% 55% 55%",
           }}
         />
 
@@ -131,24 +109,18 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           animate={{
             x: [0, -110, 140, -60, 0],
             y: [0, 140, -90, 110, 0],
-            borderRadius: [
-              "50% 50% 50% 50% / 50% 50% 50% 50%",
-              "35% 65% 55% 45% / 45% 55% 45% 55%",
-              "65% 35% 70% 30% / 55% 45% 60% 40%",
-              "45% 55% 35% 65% / 55% 35% 55% 45%",
-              "50% 50% 50% 50% / 50% 50% 50% 50%"
-            ],
           }}
           transition={{
-            duration: currentDuration * 1.1,
+            duration: animationDuration * 1.1,
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className={`absolute -bottom-10 -right-10 w-96 h-96 ${config.blur} mix-blend-screen transition-all duration-[1200ms] pointer-events-none`}
+          className={`ambient-blob absolute -bottom-10 -right-10 w-96 h-96 ${config.blur} mix-blend-screen transition-opacity duration-[1200ms] pointer-events-none`}
           style={{
             backgroundColor: config.blobB,
             opacity: config.opacityB,
             scale: config.scale,
+            borderRadius: "50% 50% 50% 50% / 50% 50% 50% 50%",
           }}
         />
 
@@ -157,24 +129,18 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           animate={{
             x: [0, 120, -130, 90, 0],
             y: [0, 90, -110, -90, 0],
-            borderRadius: [
-              "60% 40% 55% 45% / 40% 50% 50% 60%",
-              "45% 55% 40% 60% / 50% 60% 40% 50%",
-              "55% 45% 65% 35% / 60% 40% 60% 40%",
-              "35% 65% 45% 55% / 40% 50% 55% 45%",
-              "60% 40% 55% 45% / 40% 50% 50% 60%"
-            ],
           }}
           transition={{
-            duration: currentDuration * 0.9,
+            duration: animationDuration * 0.9,
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className={`absolute top-1/4 left-1/4 w-80 h-80 ${config.blur} mix-blend-screen transition-all duration-[1200ms] pointer-events-none`}
+          className={`ambient-blob absolute top-1/4 left-1/4 w-80 h-80 ${config.blur} mix-blend-screen transition-opacity duration-[1200ms] pointer-events-none`}
           style={{
             backgroundColor: config.blobC,
             opacity: config.opacityC,
             scale: config.scale,
+            borderRadius: "60% 40% 55% 45% / 40% 50% 50% 60%",
           }}
         />
 
@@ -183,24 +149,18 @@ export default function BackgroundGlow({ temperature, isIdle = false }: Backgrou
           animate={{
             x: [0, -130, 110, -100, 0],
             y: [0, -90, 130, 100, 0],
-            borderRadius: [
-              "35% 65% 45% 55% / 55% 45% 65% 35%",
-              "55% 45% 60% 40% / 45% 55% 40% 60%",
-              "65% 35% 50% 50% / 50% 50% 50% 50%",
-              "40% 60% 35% 65% / 55% 45% 60% 40%",
-              "35% 65% 45% 55% / 55% 45% 65% 35%"
-            ],
           }}
           transition={{
-            duration: currentDuration * 1.2,
+            duration: animationDuration * 1.2,
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className={`absolute bottom-1/4 right-1/4 w-80 h-80 ${config.blur} mix-blend-screen transition-all duration-[1200ms] pointer-events-none`}
+          className={`ambient-blob absolute bottom-1/4 right-1/4 w-80 h-80 ${config.blur} mix-blend-screen transition-opacity duration-[1200ms] pointer-events-none`}
           style={{
             backgroundColor: config.blobD,
             opacity: config.opacityD,
             scale: config.scale,
+            borderRadius: "35% 65% 45% 55% / 55% 45% 65% 35%",
           }}
         />
       </div>

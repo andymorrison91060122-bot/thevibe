@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { 
   Flame, 
@@ -23,6 +23,12 @@ interface Particle {
   y: number;
   color: string;
   size: number;
+}
+
+interface DragEndInfo {
+  offset: {
+    x: number;
+  };
 }
 
 interface BoardViewProps {
@@ -103,13 +109,23 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
   const rotate = useTransform(x, [-200, 200], [-15, 15]);
   const acceptOpacity = useTransform(x, [0, 100], [0, 1]);
   const skipOpacity = useTransform(x, [-100, 0], [1, 0]);
+  const cardRectRef = useRef<DOMRect | null>(null);
+  const pointerFrameRef = useRef<number | null>(null);
+  const pendingPointerRef = useRef<{
+    element: HTMLDivElement;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isDraggingCard, setIsDraggingCard] = useState(false);
 
   // Reset offset on card draw or state reset
   useEffect(() => {
     x.set(0);
   }, [cardDrawKey, x]);
 
-  const handleDragEnd = (_event: any, info: any) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: DragEndInfo) => {
+    setIsDraggingCard(false);
+    cardRectRef.current = null;
     const offset = info.offset.x;
     if (offset > 120) {
       animate(x, 600, { duration: 0.3, ease: "easeOut" }).then(() => {
@@ -124,21 +140,55 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
     }
   };
 
-  // Pointer tracking for reactive light glow & edge shimmer (120fps hardware-accelerated style changes)
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
-    card.style.setProperty('--mouse-x', `${px}px`);
-    card.style.setProperty('--mouse-y', `${py}px`);
-  };
-
-  const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
+  const resetCardSpotlight = useCallback((card: HTMLDivElement) => {
     card.style.setProperty('--mouse-x', '-999px');
     card.style.setProperty('--mouse-y', '-999px');
-  };
+  }, []);
+
+  const handlePointerEnter = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    cardRectRef.current = e.currentTarget.getBoundingClientRect();
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingCard) return;
+
+    const rect = cardRectRef.current ?? e.currentTarget.getBoundingClientRect();
+    cardRectRef.current = rect;
+    pendingPointerRef.current = {
+      element: e.currentTarget,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+
+    if (pointerFrameRef.current !== null) return;
+
+    pointerFrameRef.current = window.requestAnimationFrame(() => {
+      pointerFrameRef.current = null;
+      const pending = pendingPointerRef.current;
+      if (!pending) return;
+
+      pending.element.style.setProperty('--mouse-x', `${pending.x}px`);
+      pending.element.style.setProperty('--mouse-y', `${pending.y}px`);
+    });
+  }, [isDraggingCard]);
+
+  const handlePointerLeave = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    cardRectRef.current = null;
+    pendingPointerRef.current = null;
+    if (pointerFrameRef.current !== null) {
+      window.cancelAnimationFrame(pointerFrameRef.current);
+      pointerFrameRef.current = null;
+    }
+    resetCardSpotlight(e.currentTarget);
+  }, [resetCardSpotlight]);
+
+  useEffect(() => {
+    return () => {
+      if (pointerFrameRef.current !== null) {
+        window.cancelAnimationFrame(pointerFrameRef.current);
+      }
+    };
+  }, []);
 
   // Punishment Wheel States
   const [showPunishModal, setShowPunishModal] = useState(false);
@@ -151,7 +201,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
     title: string;
     subtitle: string;
   } | null>(null);
-  const upgradeTimerRef = React.useRef<any>(null);
+  const upgradeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [phaseBanners, setPhaseBanners] = useState<string[]>([]);
   const [currentPhase, setCurrentPhase] = useState<1 | 2 | 3>(1);
 
@@ -160,7 +210,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
   const passivePlayer = currentTurn === 'A' ? playerB : playerA;
 
   // Determine current active game phase dynamically from temperature
-  const computedPhase = React.useMemo(() => {
+  const computedPhase = React.useMemo<1 | 2 | 3>(() => {
     if (temperature <= 33) return 1;
     if (temperature <= 66) return 2;
     return 3;
@@ -237,9 +287,9 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
           : "💀 激情沸腾！解锁全灵感官『沸腾高潮』卡牌集 💀";
         setPhaseBanners(prev => [...prev, upgradeMsg]);
 
-        setCurrentPhase(computedPhase as any);
+        setCurrentPhase(computedPhase);
       } else {
-        setCurrentPhase(computedPhase as any);
+        setCurrentPhase(computedPhase);
       }
     }
   }, [computedPhase, currentPhase]);
@@ -737,18 +787,21 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
               style={{ x, rotate, touchAction: "pan-y" }}
               drag={isFlipped ? "x" : false}
               dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.8}
+              dragElastic={0.45}
+              dragMomentum={false}
+              onDragStart={() => setIsDraggingCard(true)}
               onDragEnd={handleDragEnd}
               initial={{ opacity: 0, y: 120, scale: 0.97, x: 0 }}
               animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: "tween", ease: "easeInOut", duration: 0.6 }}
-              className="w-full max-w-sm flex items-center justify-center flex-grow mb-[20px] min-h-0 select-none cursor-grab active:cursor-grabbing"
+              className={`w-full max-w-sm flex items-center justify-center flex-grow mb-[20px] min-h-0 select-none cursor-grab active:cursor-grabbing ${isDraggingCard ? 'card-dragging' : ''}`}
             >
               {/* Perspective container for elegant 3D card flipping */}
               <div 
                 style={{ perspective: "1500px" }} 
                 className="w-[280px] h-[386px] xs:w-[320px] xs:h-[442px] sm:w-[365px] sm:h-[504px] relative flex items-center justify-center min-h-0"
+                onPointerEnter={handlePointerEnter}
                 onPointerMove={handlePointerMove}
                 onPointerLeave={handlePointerLeave}
               >
@@ -840,8 +893,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={isFlipped ? { 
-                        opacity: [0.35, 0.7, 0.35],
-                        scale: [1.02, 1.07, 1.02]
+                        opacity: [0.25, 0.5, 0.25],
+                        scale: [1.01, 1.04, 1.01]
                       } : {}}
                       transition={{ 
                         delay: 0.4, 
@@ -849,7 +902,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                         repeat: Infinity, 
                         ease: "easeInOut" 
                       }}
-                      className="absolute inset-0 -z-20 rounded-3xl filter blur-2xl pointer-events-none"
+                      className="absolute inset-0 -z-20 rounded-3xl filter blur-md pointer-events-none"
                       style={{
                         backgroundImage: activeCard.phase === 1 
                           ? 'radial-gradient(circle, rgba(255,154,158,0.55) 0%, transparent 80%)' 
@@ -889,8 +942,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
                       {/* Phase & Points Header */}
                       <motion.div 
-                        initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                        animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                        initial={{ y: 8, scale: 1.03, opacity: 0 }}
+                        animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                         transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.02 }}
                         className="flex items-center justify-between border-b border-neutral-900/45 pb-1.5 flex-shrink-0"
                       >
@@ -907,8 +960,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                       {/* Icon & Title */}
                       <div className="text-center py-0.5 flex-shrink-0">
                         <motion.span 
-                          initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                          animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                          initial={{ y: 6, scale: 1.03, opacity: 0 }}
+                          animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                           transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.05 }}
                           className="text-[clamp(8px,2.2vw,10px)] font-sans font-bold text-neutral-500 uppercase tracking-widest block mb-0.5"
                         >
@@ -916,8 +969,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                         </motion.span>
                         
                         <motion.h3 
-                          initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                          animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                          initial={{ y: 8, scale: 1.03, opacity: 0 }}
+                          animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                           transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.08 }}
                           className="font-serif font-black text-neutral-100 tracking-wide leading-snug text-[clamp(13px,4vw,20px)] text-shimmer"
                         >
@@ -927,8 +980,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
                       {/* Main prompt body */}
                       <motion.div 
-                        initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                        animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                        initial={{ y: 10, scale: 1.03, opacity: 0 }}
+                        animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                         transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.15 }}
                         className="text-center px-1 py-1.5 sm:py-2.5 bg-neutral-950/40 rounded-xl border border-neutral-900/60 flex items-center justify-center flex-shrink-0"
                       >
@@ -941,8 +994,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                       <div className="space-y-2.5 mt-1.5 pt-2.5 border-t border-dashed border-neutral-900/80 flex-shrink-0 w-full font-sans">
                         {/* Active turn player instruction */}
                         <motion.div 
-                          initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                          animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                          initial={{ y: 10, scale: 1.02, opacity: 0 }}
+                          animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                           transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.22 }}
                           className="p-1.5 px-2.5 rounded-xl bg-rose-950/10 border border-rose-500/10 text-left flex-shrink-0 w-full"
                         >
@@ -957,8 +1010,8 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
                         {/* Passive player instruction */}
                         <motion.div 
-                          initial={{ filter: "blur(10px)", scale: 1.05, opacity: 0 }}
-                          animate={isFlipped ? { filter: "blur(0px)", scale: 1.0, opacity: 1 } : {}}
+                          initial={{ y: 10, scale: 1.02, opacity: 0 }}
+                          animate={isFlipped ? { y: 0, scale: 1.0, opacity: 1 } : {}}
                           transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1.0], delay: 0.28 }}
                           className="p-1.5 px-2.5 rounded-xl bg-neutral-950/30 border border-neutral-900 text-left flex-shrink-0 w-full"
                         >
@@ -1052,11 +1105,10 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
             {/* Heavy stamp slap modal box slamming center */}
             <motion.div
-              initial={{ opacity: 0, scale: 3.0, filter: 'blur(10px)', rotate: -12 }}
+              initial={{ opacity: 0, scale: 2.2, rotate: -12 }}
               animate={{ 
                 opacity: 1, 
                 scale: 1, 
-                filter: 'blur(0px)', 
                 rotate: 0,
                 x: [0, -5, 5, -3, 3, 0],
                 y: [0, 6, -6, 4, -4, 0]
@@ -1090,12 +1142,11 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                   {chosenPunish ? (
                     <motion.div
                       key={chosenPunish.id}
-                      initial={{ opacity: 0, scale: 1.8, y: -25, filter: 'blur(4px)' }}
+                      initial={{ opacity: 0, scale: 1.45, y: -20 }}
                       animate={{ 
                         opacity: 1, 
                         scale: 1, 
                         y: 0, 
-                        filter: 'blur(0px)',
                         x: [0, -3, 3, 0]
                       }}
                       exit={{ opacity: 0 }}
@@ -1166,7 +1217,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, filter: "blur(15px)" }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.8, ease: "easeInOut" }}
             className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/98 text-center overflow-hidden"
           >
@@ -1185,7 +1236,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                   duration: 4.8,
                   ease: "easeInOut",
                 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full filter blur-[100px]"
+                className="stage-motion-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full filter blur-[60px]"
                 style={{
                   backgroundImage: activeStageUpgrade.phase === 2 
                     ? "radial-gradient(circle, #FF0844 0%, #FFB199 50%, transparent 100%)" 
@@ -1206,11 +1257,11 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                   duration: 4.8,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full filter blur-[70px] bg-neutral-950"
+                className="stage-motion-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] rounded-full filter blur-[40px] bg-neutral-950"
                 style={{
                   border: activeStageUpgrade.phase === 2
-                    ? "20px double rgba(255, 8, 68, 0.65)"
-                    : "20px double rgba(178, 36, 239, 0.65)",
+                    ? "12px double rgba(255, 8, 68, 0.65)"
+                    : "12px double rgba(178, 36, 239, 0.65)",
                 }}
               />
 
@@ -1226,7 +1277,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                   duration: 4.8,
                   ease: "easeOut",
                 }}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full border-[10px] filter blur-[4px]"
+                className="stage-motion-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border-[8px]"
                 style={{
                   borderColor: activeStageUpgrade.phase === 2 ? "#FF0844" : "#B224EF",
                   boxShadow: activeStageUpgrade.phase === 2 
@@ -1246,18 +1297,18 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
             {/* CINEMATIC TEXT CONTROLLER (FADES & BREATHES (0.95 to 1.05) WITH MORPHING GLASS) */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.92, filter: "blur(12px)" }}
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
               animate={{
                 opacity: [0, 1, 1, 0],
                 scale: [0.92, 0.98, 1.04, 0.95],
-                filter: ["blur(12px)", "blur(0px)", "blur(0px)", "blur(16px)"],
+                y: [12, 0, 0, -8],
               }}
               transition={{
                 times: [0, 0.28, 0.86, 1],
                 duration: 4.8,
                 ease: [0.25, 1, 0.5, 1],
               }}
-              className="relative z-20 max-w-md mx-auto space-y-6 px-8 py-10 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_24px_50px_-12px_rgba(0,0,0,0.9)] text-center"
+              className="relative z-20 max-w-md mx-auto space-y-6 px-8 py-10 rounded-3xl border border-white/5 bg-white/[0.04] backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_24px_50px_-12px_rgba(0,0,0,0.9)] text-center"
             >
               {/* Top micro tag */}
               <motion.div

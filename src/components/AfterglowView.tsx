@@ -31,7 +31,7 @@ export default function AfterglowView({ onRestart }: AfterglowViewProps) {
             duration: 15,
             ease: "easeInOut",
           }}
-          className="absolute -top-1/4 -left-1/4 w-[150%] h-[150%] rounded-full bg-gradient-to-br from-[#FF0844]/25 via-transparent to-transparent filter blur-[150px]"
+          className="stage-motion-layer absolute -top-1/4 -left-1/4 w-[120%] h-[120%] rounded-full bg-gradient-to-br from-[#FF0844]/25 via-transparent to-transparent filter blur-[90px]"
         />
 
         {/* Deep, glowing light orb B */}
@@ -47,7 +47,7 @@ export default function AfterglowView({ onRestart }: AfterglowViewProps) {
             duration: 18,
             ease: "easeInOut",
           }}
-          className="absolute -bottom-1/4 -right-1/4 w-[140%] h-[140%] rounded-full bg-gradient-to-tl from-[#B224EF]/20 via-transparent to-transparent filter blur-[160px]"
+          className="stage-motion-layer absolute -bottom-1/4 -right-1/4 w-[120%] h-[120%] rounded-full bg-gradient-to-tl from-[#B224EF]/20 via-transparent to-transparent filter blur-[90px]"
         />
 
         {/* Ambient center focus */}
@@ -61,7 +61,7 @@ export default function AfterglowView({ onRestart }: AfterglowViewProps) {
             duration: 8,
             ease: "easeInOut",
           }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-rose-500/10 filter blur-[100px]"
+          className="stage-motion-layer absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full bg-rose-500/10 filter blur-[60px]"
         />
       </div>
 
