@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
+import { PHASE_THREE_THRESHOLD, PHASE_TWO_THRESHOLD } from '../constants/game';
 
 interface BackgroundGlowProps {
   temperature: number; // 0 to 100
@@ -7,13 +8,9 @@ interface BackgroundGlowProps {
 }
 
 export default function BackgroundGlow({ temperature, isIdle = false }: BackgroundGlowProps) {
-  // Classify temperature into 3 phases with high-fidelity thresholds:
-  // Phase 1: <= 33
-  // Phase 2: >= 34 && <= 66
-  // Phase 3: >= 67
   const phase = useMemo(() => {
-    if (temperature <= 33) return 1;
-    if (temperature <= 66) return 2;
+    if (temperature < PHASE_TWO_THRESHOLD) return 1;
+    if (temperature < PHASE_THREE_THRESHOLD) return 2;
     return 3;
   }, [temperature]);
 

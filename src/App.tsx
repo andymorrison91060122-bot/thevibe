@@ -53,8 +53,8 @@ export default function App() {
   };
 
   const handleOathSealed = () => {
-    // Game begins, start game score at 20 degrees
-    setAmbientTemp(20);
+    // Game begins from a clean temperature baseline
+    setAmbientTemp(0);
     setCurrentScreen('board');
   };
 

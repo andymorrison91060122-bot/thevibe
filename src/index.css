@@ -75,7 +75,8 @@
 }
 
 .card-dragging .glass-card::before,
-.card-dragging .glass-card::after {
+.card-dragging .glass-card::after,
+.card-dragging .card-aura {
   opacity: 0;
 }
 
@@ -215,4 +216,3 @@
   background-clip: text;
   animation: textShimmer 12s linear infinite;
 }
-
