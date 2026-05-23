@@ -602,24 +602,21 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
   const isCardUnlockedForCurrentTemperature = useCallback((card: Card) => {
     const level = getCardLevel(card);
-    if (level === 1) return true;
-    if (level === 2) {
-      return intensityLimit !== 'level1' && temperature >= PHASE_TWO_THRESHOLD;
-    }
-    if (level === 3) {
-      return (
-        intensityLimit === 'all' &&
-        temperature >= PHASE_THREE_THRESHOLD &&
-        phase3Unlocked &&
-        !phase3OptedOut
-      );
-    }
-    return (
+    const phaseThreeActive = (
       intensityLimit === 'all' &&
-      temperature >= LEVEL_FOUR_UNLOCK_THRESHOLD &&
+      temperature >= PHASE_THREE_THRESHOLD &&
       phase3Unlocked &&
       !phase3OptedOut
     );
+
+    if (level === 1) return !phaseThreeActive;
+    if (level === 2) {
+      return !phaseThreeActive && intensityLimit !== 'level1' && temperature >= PHASE_TWO_THRESHOLD;
+    }
+    if (level === 3) {
+      return phaseThreeActive;
+    }
+    return phaseThreeActive && temperature >= LEVEL_FOUR_UNLOCK_THRESHOLD;
   }, [intensityLimit, phase3OptedOut, phase3Unlocked, temperature]);
 
   // Filter possible cards based on the active card-library level.
