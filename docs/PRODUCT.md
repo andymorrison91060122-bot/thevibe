@@ -164,14 +164,14 @@ landing -> setup -> oath -> board -> afterglow -> landing
 -> 玩家向右滑：完成卡牌
 -> 玩家向左滑：进入惩罚缓冲区
 -> 处理完成后切换回合
--> deck 为空时进入 afterglow
+-> deck 为空或本轮已处理 80 张卡牌时进入 afterglow
 ```
 
 ### 5.5 Afterglow 结束页
 
 代码入口：`src/components/AfterglowView.tsx`
 
-当卡池抽完后进入结束页。
+当卡池抽完，或本轮已处理 80 张卡牌后进入结束页。
 
 主要功能：
 
@@ -202,6 +202,7 @@ landing -> setup -> oath -> board -> afterglow -> landing
 - 直接跳过会降低 5 点温度，最低不低于 0。
 - 从 Phase 1 进入 Phase 2 时，会触发短促升温动效。
 - 从 Phase 2 进入 Phase 3 前，必须完成双方共燃确认；确认后才触发 Phase 3 全屏过场。
+- 卡牌库中的 `级别4` 不新增第四个视觉阶段；它属于 Phase 3 的隐藏延展卡池，只在完整模式、Phase 3 已完成双方确认、且温度达到 100 后才允许抽出。
 
 当前版本已统一游戏初始温度为 0。
 
@@ -219,6 +220,7 @@ landing -> setup -> oath -> board -> afterglow -> landing
 interface Card {
   id: string;
   phase: 1 | 2 | 3;
+  level?: 1 | 2 | 3 | 4;
   type: 'topic' | 'game' | 'action' | 'play';
   title: string;
   content: string;
@@ -232,6 +234,7 @@ interface Card {
 
 - `id`：唯一标识，不应重复。
 - `phase`：所属温度阶段。
+- `level`：卡牌库强度级别；未填写时默认等于 `phase`。从飞书导入 `级别4` 时，应写为 `phase: 3, level: 4`。
 - `type`：卡牌类型，当前包括走心、默契、触碰、玩乐。
 - `title`：卡牌标题。
 - `content`：双方共同看到的核心任务。
@@ -243,10 +246,11 @@ interface Card {
 
 当前源码中的实际业务卡牌：
 
-- Phase 1：6 张。
-- Phase 2：6 张。
-- Phase 3：5 张。
-- 惩罚项：8 条。
+- 主卡牌：108 张。
+- Phase 1：36 张。
+- Phase 2：10 张。
+- Phase 3：62 张，其中 `level: 4` 延展卡 52 张。
+- 惩罚项：48 条。
 
 ### 7.3 抽牌规则
 
@@ -254,15 +258,20 @@ interface Card {
 
 - `level1`：仅 Phase 1。
 - `level2`：Phase 1 + Phase 2。
-- `all`：Phase 1 + Phase 2 + Phase 3。
+- `all`：Phase 1 + Phase 2 + Phase 3，并保留 `level: 4` 的隐藏延展卡。
 
-过滤后会进行一次随机洗牌。
+过滤后会进行一次 Fisher-Yates 随机洗牌，避免开局卡组顺序固定。
 
 每次抽牌时再根据当前温度决定允许抽出的阶段：
 
 - 温度小于 40：只优先抽 Phase 1。
 - 温度达到 40：允许抽 Phase 1 + Phase 2。
 - 温度达到 80 且深度刻度为 `all`，并完成共燃确认：允许抽 Phase 1 + Phase 2 + Phase 3。
+- 温度达到 100 且深度刻度为 `all`，并完成共燃确认：允许抽 `level: 4` 卡牌；未达到 100 前不能抽出 `level: 4`。
+
+每一次抽牌不是固定取 deck 中第一张牌，而是先计算当前已解锁、未抽过的候选集合，再从候选集合中随机抽取一张。这样在同一大卡池下，新局和旧局不容易出现完全相同的体验顺序。
+
+单局最多处理 80 张卡牌。完成卡牌、完成惩罚或直接跳过都会计入本轮已处理数量；达到 80 张后直接进入结束流程，即使 deck 中仍有剩余卡牌。
 
 如果当前 deck 中没有符合阶段的卡，不应 fallback 抽取更高阶段卡牌；若此时达到 Phase 3 条件，则先进入共燃确认，否则进入结束流程。
 
@@ -393,13 +402,15 @@ interface Player {
 
 - 不再把全部卡牌堆在单个 `cards.ts` 文件中。
 - 按阶段拆分，例如 `phase1Cards.ts`、`phase2Cards.ts`、`phase3Cards.ts`。
-- 每局不一定抽完整个 200 张卡池，应支持随机生成一局卡组。
-- 每局卡组建议控制在 30-50 张，避免游戏过长。
+- 飞书表格中的 `级别4` 应作为 Phase 3 的 100° 后延展卡池导入，不应创建新的温度计阶段。
+- 每局不要求抽完整个 200 张卡池，系统硬性限制单局最多处理 80 张。
+- 每次抽牌从当前已解锁候选集合中随机抽取，避免大卡池仍呈现固定顺序。
 
 新增卡牌验收标准：
 
 - `id` 唯一，且能看出阶段和序号。
 - `phase` 与内容强度一致。
+- `level` 与飞书表格的卡牌级别一致；`level: 4` 必须搭配 `phase: 3`，并遵守 100° 解锁规则。
 - `type` 使用现有枚举，除非产品文档先扩展新类型。
 - `content` 是双方共同任务，不偏向某一方。
 - `initiatorPrompt` 和 `receiverPrompt` 必须同时存在。
@@ -434,7 +445,7 @@ interface Player {
 
 - `types.ts` 中定义了 `GameState`，但当前业务状态主要分散在多个组件的 `useState` 中。
 - `history` 字段未被当前流程使用。
-- `discardedCount` 会递增，但当前界面没有展示进度或历史。
+- `discardedCount` 会递增，并用于控制单局 80 张上限；当前界面没有展示进度或历史。
 
 ## 13. 后续产品债务
 
@@ -443,8 +454,8 @@ interface Player {
 1. 统一初始温度  
    `App` 和 `BoardView` 的初始温度存在 20 与 15 的差异。
 
-2. 单局长度控制  
-   当前逻辑默认抽完整个过滤后的 deck。卡牌扩展到 200 张后，需要支持“每局抽取 N 张”。
+2. 单局长度可配置  
+   当前逻辑已限制单局最多 80 张；后续如需按模式设置不同上限，可把该值从常量升级为配置。
 
 3. 数据结构拆分  
    卡牌增多后应拆分文件或改为可导入的数据源。

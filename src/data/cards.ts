@@ -1,6 +1,16 @@
+import { FEISHU_CARDS, FEISHU_PENALTIES } from './feishuCards';
+
+export type CardPhase = 1 | 2 | 3;
+export type CardLevel = CardPhase | 4;
+
 export interface Card {
   id: string;
-  phase: 1 | 2 | 3;
+  phase: CardPhase;
+  /**
+   * Content intensity level from the card library.
+   * Level 4 is still rendered as Phase 3, but only unlocks at 100°C.
+   */
+  level?: CardLevel;
   type: 'topic' | 'game' | 'action' | 'play'; // 走心 | 默契 | 触碰 | 玩乐
   title: string;
   content: string;
@@ -14,7 +24,9 @@ export interface PenaltyTask {
   text: string;
 }
 
-export const CARDS_POOL: Card[] = [
+export const getCardLevel = (card: Card): CardLevel => card.level ?? card.phase;
+
+const BASE_CARDS_POOL: Card[] = [
   // =================== PHASE 1: 破冰微温 (Ice-breaking) ===================
   {
     id: 'p1-1',
@@ -192,7 +204,9 @@ export const CARDS_POOL: Card[] = [
   }
 ];
 
-export const PENALTY_POOL: PenaltyTask[] = [
+export const CARDS_POOL: Card[] = [...BASE_CARDS_POOL, ...FEISHU_CARDS];
+
+const BASE_PENALTY_POOL: PenaltyTask[] = [
   { id: 'pen-1', text: '两人各自端起酒杯，深情对视并喝下一小口（或果汁、饮料）。' },
   { id: 'pen-2', text: '认罚者用小拇指在对方掌心轻轻画三个圆圈，再让对方猜最后停在哪个位置。' },
   { id: 'pen-3', text: '认罚者双手环抱对方，在对方背后盲写一个字，让对方猜。' },
@@ -202,3 +216,5 @@ export const PENALTY_POOL: PenaltyTask[] = [
   { id: 'pen-7', text: '认罚者用一句只属于今晚的称呼叫对方，并保持对视 5 秒。' },
   { id: 'pen-8', text: '认罚者把手交给对方，由对方牵住并决定保持多久，最长不超过 15 秒。' }
 ];
+
+export const PENALTY_POOL: PenaltyTask[] = [...BASE_PENALTY_POOL, ...FEISHU_PENALTIES];

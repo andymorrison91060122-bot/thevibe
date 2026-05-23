@@ -14,8 +14,8 @@ import {
   HandHeart,
   WandSparkles
 } from 'lucide-react';
-import { Card, CARDS_POOL, PENALTY_POOL, PenaltyTask } from '../data/cards';
-import { PHASE_THREE_THRESHOLD, PHASE_TWO_THRESHOLD } from '../constants/game';
+import { Card, CARDS_POOL, PENALTY_POOL, PenaltyTask, getCardLevel } from '../data/cards';
+import { LEVEL_FOUR_UNLOCK_THRESHOLD, MAX_ROUND_CARDS, PHASE_THREE_THRESHOLD, PHASE_TWO_THRESHOLD } from '../constants/game';
 import { Player } from '../types';
 import { triggerVibration } from '../utils/haptics';
 
@@ -41,6 +41,8 @@ interface BoardViewProps {
   onTemperatureChange: (temp: number) => void;
 }
 
+type IntensityLimit = BoardViewProps['intensityLimit'];
+
 interface ResonanceHeartbeatProps {
   active: boolean;
   completed: boolean;
@@ -55,6 +57,38 @@ const CARD_REVEAL_DELAY_MS = 420;
 const CARD_EXIT_SETTLE_MS = 120;
 const CARD_SWIPE_RESET_MS = 540;
 const PUNISHMENT_CLOSE_SETTLE_MS = 180;
+
+const isCardWithinSelectedDepth = (card: Card, intensityLimit: IntensityLimit) => {
+  const level = getCardLevel(card);
+  if (intensityLimit === 'level1') return level === 1;
+  if (intensityLimit === 'level2') return level <= 2;
+  return true;
+};
+
+const randomInt = (maxExclusive: number) => {
+  if (maxExclusive <= 0) return 0;
+
+  if (globalThis.crypto?.getRandomValues) {
+    const buffer = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(buffer);
+    return buffer[0] % maxExclusive;
+  }
+
+  return Math.floor(Math.random() * maxExclusive);
+};
+
+const shuffleCards = (cards: Card[]) => {
+  const shuffled = [...cards];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+const shouldEndRound = (resolvedCardCount: number, remainingDeckCount: number) => (
+  resolvedCardCount >= MAX_ROUND_CARDS || remainingDeckCount === 0
+);
 
 function ResonanceHeartbeat({ active, completed, ratio, pulseDuration }: ResonanceHeartbeatProps) {
   const pathLength = active || completed ? Math.min(1, 0.36 + ratio * 0.64) : 0.28;
@@ -203,14 +237,8 @@ const CARD_TYPE_META: Record<CardType, {
 export default function BoardView({ playerA, playerB, intensityLimit, onClimax, onTemperatureChange }: BoardViewProps) {
   // 1. Filter card pool based on selected intensity
   const initialPool = React.useMemo(() => {
-    let pool = CARDS_POOL;
-    if (intensityLimit === 'level1') {
-      pool = CARDS_POOL.filter(c => c.phase === 1);
-    } else if (intensityLimit === 'level2') {
-      pool = CARDS_POOL.filter(c => c.phase === 1 || c.phase === 2);
-    }
-    // Shuffle the pool initially
-    return [...pool].sort(() => Math.random() - 0.5);
+    const pool = CARDS_POOL.filter(card => isCardWithinSelectedDepth(card, intensityLimit));
+    return shuffleCards(pool);
   }, [intensityLimit]);
 
   // Game States
@@ -572,26 +600,38 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
     !phase3OptedOut
   ), [intensityLimit, phase3OptedOut, phase3Unlocked]);
 
-  // Filter possible cards based on current phase (level-up dynamics)
-  // This ensures players don't draw Phase 3 cards immediately even if 'all' is selected.
-  // Instead, the active draw stack delivers cards matching the temperature scale!
-  const getNextAppropriateCard = () => {
-    // Determine target phase scope
-    const targetPhasesAllowed = [1];
-    if (intensityLimit !== 'level1' && temperature >= PHASE_TWO_THRESHOLD) {
-      targetPhasesAllowed.push(2);
+  const isCardUnlockedForCurrentTemperature = useCallback((card: Card) => {
+    const level = getCardLevel(card);
+    if (level === 1) return true;
+    if (level === 2) {
+      return intensityLimit !== 'level1' && temperature >= PHASE_TWO_THRESHOLD;
     }
-    if (
+    if (level === 3) {
+      return (
+        intensityLimit === 'all' &&
+        temperature >= PHASE_THREE_THRESHOLD &&
+        phase3Unlocked &&
+        !phase3OptedOut
+      );
+    }
+    return (
       intensityLimit === 'all' &&
-      temperature >= PHASE_THREE_THRESHOLD &&
+      temperature >= LEVEL_FOUR_UNLOCK_THRESHOLD &&
       phase3Unlocked &&
       !phase3OptedOut
-    ) {
-      targetPhasesAllowed.push(3);
-    }
+    );
+  }, [intensityLimit, phase3OptedOut, phase3Unlocked, temperature]);
 
-    // Look for a card in deck that matches allowed phase scope
-    let index = deck.findIndex(c => targetPhasesAllowed.includes(c.phase));
+  // Filter possible cards based on the active card-library level.
+  // Level 4 is a hidden Phase 3 extension and only enters the draw stack at 100°C.
+  const getNextAppropriateCard = () => {
+    // Pick randomly from the currently unlocked cards so large pools do not repeat a fixed deck order.
+    const eligibleIndexes = deck.reduce<number[]>((indexes, card, index) => {
+      if (isCardUnlockedForCurrentTemperature(card)) indexes.push(index);
+      return indexes;
+    }, []);
+
+    const index = eligibleIndexes[randomInt(eligibleIndexes.length)] ?? -1;
 
     if (index !== -1) {
       const card = deck[index];
@@ -609,6 +649,11 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
   // Turn management
   const handleDrawCard = () => {
     if (activeCard) return; // Must finish current card
+    if (discardedCount >= MAX_ROUND_CARDS) {
+      onClimax();
+      return;
+    }
+
     const card = getNextAppropriateCard();
     if (!card) {
       if (shouldPromptPhaseThree(temperature)) {
@@ -648,24 +693,26 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
     setActiveCard(null);
     setIsFlipped(false);
     setParticles([]);
-    setDiscardedCount(prev => prev + 1);
+    const nextDiscardedCount = discardedCount + 1;
+    setDiscardedCount(nextDiscardedCount);
     setTimeout(() => {
       x.set(0);
     }, CARD_SWIPE_RESET_MS);
+
+    if (shouldEndRound(nextDiscardedCount, deck.length)) {
+      // Trigger elegant climax view when the round cap is reached or the available deck is fully processed.
+      setTimeout(() => {
+        onClimax();
+      }, 1200);
+      return;
+    }
 
     if (shouldPromptPhaseThree(nextTemp)) {
       setShowResonanceConfirm(true);
     }
 
-    if (deck.length === 0) {
-      // Trigger elegant climax view only when the last card is fully completed and processed
-      setTimeout(() => {
-        onClimax();
-      }, 1200);
-    } else {
-      // Switch turn
-      setCurrentTurn(currentTurn === 'A' ? 'B' : 'A');
-    }
+    // Switch turn
+    setCurrentTurn(currentTurn === 'A' ? 'B' : 'A');
   };
 
   const handleSkipCard = () => {
@@ -715,9 +762,10 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
       x.set(0);
       setActiveCard(null);
       setIsFlipped(false);
-      setDiscardedCount(prev => prev + 1);
+      const nextDiscardedCount = discardedCount + 1;
+      setDiscardedCount(nextDiscardedCount);
 
-      if (deck.length === 0) {
+      if (shouldEndRound(nextDiscardedCount, deck.length)) {
         setTimeout(() => {
           onClimax();
         }, 1200);
@@ -737,9 +785,10 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
       x.set(0);
       setActiveCard(null);
       setIsFlipped(false);
-      setDiscardedCount(prev => prev + 1);
+      const nextDiscardedCount = discardedCount + 1;
+      setDiscardedCount(nextDiscardedCount);
 
-      if (deck.length === 0) {
+      if (shouldEndRound(nextDiscardedCount, deck.length)) {
         setTimeout(() => {
           onClimax();
         }, 1200);
@@ -751,6 +800,16 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
 
   const activeCardTypeMeta = activeCard ? CARD_TYPE_META[activeCard.type] : null;
   const ActiveCardTypeIcon = activeCardTypeMeta?.Icon;
+  const activeCardLevel = activeCard ? getCardLevel(activeCard) : null;
+  const activeCardStageLabel = activeCard
+    ? activeCardLevel === 4
+      ? 'LEVEL 04'
+      : activeCard.phase === 1
+        ? 'PHASE 01'
+        : activeCard.phase === 2
+          ? 'PHASE 02'
+          : 'PHASE 03'
+    : '';
   const resonanceRatio = resonanceProgress / RESONANCE_COMPLETE;
   const resonancePulseDuration = Math.max(0.32, 1.35 - resonanceRatio * 0.95);
 
@@ -1182,7 +1241,7 @@ export default function BoardView({ playerA, playerB, intensityLimit, onClimax, 
                         <span className={`text-[9.5px] sm:text-[10px] font-sans font-bold tracking-[0.25em] uppercase ${
                           activeCard.phase === 1 ? 'text-[#FF9A9E]' : activeCard.phase === 2 ? 'text-[#FF0844]' : 'text-[#B224EF]'
                         }`}>
-                          {activeCard.phase === 1 ? 'PHASE 01' : activeCard.phase === 2 ? 'PHASE 02' : 'PHASE 03'}
+                          {activeCardStageLabel}
                         </span>
                         <span className="text-[9.5px] sm:text-[10px] font-mono font-bold text-neutral-400">
                           +{activeCard.points}°C

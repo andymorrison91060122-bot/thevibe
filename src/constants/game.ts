@@ -1,2 +1,4 @@
 export const PHASE_TWO_THRESHOLD = 40;
 export const PHASE_THREE_THRESHOLD = 80;
+export const LEVEL_FOUR_UNLOCK_THRESHOLD = 100;
+export const MAX_ROUND_CARDS = 80;
