@@ -1,20 +1,7 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+The Vibe 是一款面向亲密伴侣的双人互动卡牌网页，通过温度阶段、共识确认、随机卡牌与轻惩罚机制，引导双方在安全、自愿、循序渐进的氛围中完成更深入的交流与亲密互动。
 
-# Run and deploy your AI Studio app
+如果是 GitHub repo 的一句话 description，可以用更短的：
 
-This contains everything you need to run your app locally.
+Repo Description：
 
-View your app in AI Studio: https://ai.studio/apps/61a2c2c1-4c5b-4ff0-a0e2-4ccf49dbd278
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+一款面向亲密伴侣的双人互动卡牌网页，用温度、阶段和共识仪式串联走心交流与亲密互动。
